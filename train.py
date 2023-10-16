@@ -1,6 +1,6 @@
 import torch 
 import torch.nn as nn
-from einops import rearrange
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import tqdm
@@ -12,12 +12,14 @@ import cv2 as cv
 import torchvision.transforms as transforms
 from data_processing import DIV2k, PSNRData
 from model import EDSR
+from utils import *
 import pickle
-from torchmetrics.image import PeakSignalNoiseRatio
+import sys
 
 class checkpoint():
     def __init__(self, name):
         self.name = name
+        self.params = {}
         self.loss = []
         self.acc = []
         self.total_loss = 0
@@ -54,24 +56,25 @@ class checkpoint():
         self.total_y = 0
         self.total_correct = 0
 
-
-def train(ckp, batch_size=16, size=96, lr=10e-4, epochs=1):
-    dataset = DIV2k(train=True, size=size) 
-    test_dataset = DIV2k(train=False, size=size)
-    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+def train(ckp, **kwargs):
+    for k,v in kwargs.items():
+        ckp.params[k] = v
+    dataset = DIV2k(train=True, size=kwargs['size']) 
+    test_dataset = DIV2k(train=False, size=kwargs['size'])
+    train_loader = DataLoader(dataset, batch_size=kwargs['batch_size'], shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-    model = EDSR().cuda()
+    model = EDSR(F=kwargs['F'], B=kwargs['B'], res_scale=kwargs['res_scale']).cuda()
     criterion = nn.L1Loss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=kwargs['lr'])
 
     if ckp.model_weights is not None:
         model.load_state_dict(ckp.model_weights)
         optimizer.load_state_dict(ckp.optim_state)
+        optimizer.param_groups[0]['lr'] = kwargs['lr']
 
-    epochs = epochs
-    for i in range(epochs):
+    for i in range(kwargs['epochs']):
         model.train()
-        total_iters = int(dataset.__len__() / batch_size)
+        total_iters = int(dataset.__len__() / kwargs['batch_size'])
         progress_bar = tqdm.tqdm(total=total_iters, desc='Epoch', unit='iter')
         for bidx, (x,y) in enumerate(train_loader):
             ckp.iters += 1
@@ -81,7 +84,7 @@ def train(ckp, batch_size=16, size=96, lr=10e-4, epochs=1):
             optimizer.zero_grad()
             loss = criterion(outputs, y)
             loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            #nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             ckp.update_loss(loss, bidx)
             ckp.update_accuracy(outputs, y)
@@ -108,61 +111,13 @@ def train(ckp, batch_size=16, size=96, lr=10e-4, epochs=1):
         else:
             ckp.test_acc = prev_test_acc
 
-def visual_test(ckp):
-    dataset = DIV2k(train=False, size=224, full=True) 
-    model = EDSR().cuda().eval()
-    if ckp.model_weights is not None:
-        model.load_state_dict(ckp.model_weights)
-    for _ in range(16):
-        r = random.randint(1,99)
-        x,y = dataset[r]
-        x, y = x.cuda().unsqueeze(0), y.unsqueeze(0)
-        output = model(x)
-        output = output.cpu()
-        x = x.cpu()
-        mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
-        std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
-        x = ((x*std) + mean) * 255
-        display(x,output,False)
-
-def test_pnr(ckp, testset):
-    dataset = PSNRData(testset)
-    test_loader = DataLoader(dataset, batch_size=1, shuffle=True)
-    model = EDSR().eval()
-    total_psnr = 0
-    psnr = PeakSignalNoiseRatio()
-    if ckp.model_weights is not None:
-        model.load_state_dict(ckp.model_weights)
-    with torch.no_grad():
-        for bidx,(x,y) in enumerate(test_loader):
-            outputs = model(x)
-            p = psnr(outputs, y)
-            total_psnr += p
-    print(f'Final PSNR {(total_psnr / dataset.__len__()).item()}')
-
-def display(image, image_real, normalize=True):
-    image_real = image_real.squeeze(0)
-    image = image.squeeze(0)
-    image = image.permute(1,2,0)
-    image_real = image_real.permute(1,2,0)
-    image = image.int().numpy()
-    image_real = image_real.int().numpy()
-    fig, axes = plt.subplots(1, 2)
-    axes[0].imshow(image)
-    axes[0].axis('off')
-    axes[1].imshow(image_real)
-    axes[1].axis('off')
-
-    plt.tight_layout()
-    plt.show()
-
 def main():
-    #ckp = checkpoint("test1")
-    with open('checkpoints/test1.pkl', 'rb') as f:
-        ckp = pickle.load(f)
-    #train(ckp, batch_size=16, size=96, lr=10e-4, epochs=5)
-    #test_pnr(ckp, 'Set14')
-    visual_test(ckp)
+    ckp = checkpoint('test4')
+    # with open('checkpoints/test1.pkl', 'rb') as f:
+    #     ckp = pickle.load(f)
+    train(ckp, F=128, B=8, res_scale=0.1, size=96, lr=10e-4, batch_size=16, epochs=50)
+    #test_pnr(ckp, 'Set5', C=64)
+    #visual_test(ckp)
 
 if __name__ == '__main__':
     main()

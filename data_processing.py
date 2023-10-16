@@ -13,7 +13,7 @@ import os
 import random
 
 class DIV2k(Dataset):
-    def __init__(self, size=224, kernel_size=(7,7), sigma=(.1,10.0), train=True, full=False):
+    def __init__(self, size=224, kernel_size=(7,7), sigma=(.1,7.5), train=True, full=False):
         self.size = size
         path = '../datasets/DIV2K_'
         path += 'train_HR' if train else 'valid_HR'
