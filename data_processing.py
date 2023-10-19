@@ -13,7 +13,7 @@ import os
 import random
 
 class DIV2k(Dataset):
-    def __init__(self, size=224, kernel_size=(7,7), sigma=(.1,7.5), train=True, full=False):
+    def __init__(self, size=224, kernel_size=(5,5), sigma=(.1,2), train=True, full=False):
         self.size = size
         path = '../datasets/DIV2K_'
         path += 'train_HR' if train else 'valid_HR'
@@ -37,7 +37,7 @@ class DIV2k(Dataset):
         img = self.crop(img)
         x = img.clone().detach()
         x = self.blur(x)
-        x = F.interpolate(x.unsqueeze(0), size=(int(self.size/2),int(self.size/2)), mode='bicubic').squeeze(0)
+        x = F.interpolate(x.unsqueeze(0), size=(int(x.shape[1]/2),int(x.shape[2]/2)), mode='bicubic').squeeze(0)
         y = img.clone().detach()
         x = x / 255.0
         x = self.normalize(x)
@@ -78,14 +78,14 @@ def display(image, image_real):
     plt.show()
 
 def main():
-    # dataset = DIV2k(train=False, size=96)
-    # for _ in range(30):
-    #     x, y = dataset[0]
-    #     display(x, y)
-    dataset = PSNRData(dataset='Set14')
+    dataset = DIV2k(train=False, size=96)
     for _ in range(30):
         x, y = dataset[0]
         display(x, y)
+    # dataset = PSNRData(dataset='Set14')
+    # for _ in range(30):
+    #     x, y = dataset[0]
+    #     display(x, y)
 
 if __name__ == '__main__':
     main()

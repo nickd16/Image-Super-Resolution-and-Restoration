@@ -11,7 +11,7 @@ import random
 import cv2 as cv
 import torchvision.transforms as transforms
 from data_processing import DIV2k, PSNRData
-from model import EDSR
+from edsr import *
 from utils import *
 import pickle
 import sys
@@ -49,6 +49,12 @@ class checkpoint():
     def __repr__(self):
         return f'{self.name} | acc={self.acc[-1]:.4f}'
     
+    def load_params(self, model, kwargs):
+        for k,v in kwargs.items():
+            self.params[k] = v
+        for k,v in model.params.items():
+            self.parmas[k] = v
+
     def reset(self):
         self.total_loss = 0
         self.test_total = 0
@@ -56,14 +62,13 @@ class checkpoint():
         self.total_y = 0
         self.total_correct = 0
 
-def train(ckp, **kwargs):
-    for k,v in kwargs.items():
-        ckp.params[k] = v
+def train(ckp, model, **kwargs):
+    ckp.load_params(model, kwargs)
+    model = model.cuda()
     dataset = DIV2k(train=True, size=kwargs['size']) 
     test_dataset = DIV2k(train=False, size=kwargs['size'])
     train_loader = DataLoader(dataset, batch_size=kwargs['batch_size'], shuffle=True, drop_last=True)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-    model = EDSR(F=kwargs['F'], B=kwargs['B'], res_scale=kwargs['res_scale']).cuda()
+    test_loader = DataLoader(test_dataset, batch_size=1)
     criterion = nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=kwargs['lr'])
 
@@ -112,10 +117,11 @@ def train(ckp, **kwargs):
             ckp.test_acc = prev_test_acc
 
 def main():
-    ckp = checkpoint('test4')
-    # with open('checkpoints/test1.pkl', 'rb') as f:
-    #     ckp = pickle.load(f)
-    train(ckp, F=128, B=8, res_scale=0.1, size=96, lr=10e-4, batch_size=16, epochs=50)
+    #ckp = checkpoint('test4')
+    with open('checkpoints/test4.pkl', 'rb') as f:
+        ckp = pickle.load(f)
+    model = EDSR(F=64, B=16, res_scale=0.1)
+    train(model, ckp, size=96, lr=10e-5, batch_size=16, epochs=100)
     #test_pnr(ckp, 'Set5', C=64)
     #visual_test(ckp)
 
