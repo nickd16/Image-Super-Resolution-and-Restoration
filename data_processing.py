@@ -2,6 +2,7 @@ import torch
 import torchvision.datasets as datasets
 import matplotlib.pyplot as plt 
 import torchvision.transforms as transforms
+import torchvision.transforms.functional as tf
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from einops import rearrange
@@ -11,6 +12,16 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 import os
 import random
+
+def augment(x, y):
+    angles = [90,180,270,360]
+    if random.random() > 0.5:
+        x = tf.hflip(x)
+        y = tf.hflip(y)
+    angle = angles[random.randint(0,3)]
+    x = tf.rotate(x, angle)
+    y = tf.rotate(y, angle)
+    return x,y
 
 class DIV2k(Dataset):
     def __init__(self, size=224, kernel_size=(5,5), sigma=(.1,2), train=True, full=False):
@@ -39,6 +50,7 @@ class DIV2k(Dataset):
         x = self.blur(x)
         x = F.interpolate(x.unsqueeze(0), size=(int(x.shape[1]/2),int(x.shape[2]/2)), mode='bicubic').squeeze(0)
         y = img.clone().detach()
+        x, y = augment(x, y)
         x = x / 255.0
         x = self.normalize(x)
         return (x,y)
@@ -78,16 +90,13 @@ def display(image, image_real):
     plt.show()
 
 def main():
-    dataset = DIV2k(train=True, size=96)
-    mean = torch.zeros(3)
-    # std = torch.zeros(3)
-    # for _ in range(dataset.__len__()):
-    #     x = dataset[0]
-    #     x = x / 255.0
-    #     std += torch.std(x, dim=(1,2))
-    #     mean += torch.mean(x, dim=(1,2))
-    # print(mean / dataset.__len__())
-    # print(std / dataset.__len__())
+    dataset = DIV2k(train=False, size=96)
+    for _ in range(5):
+        x,y  = dataset[0] 
+        z = y.clone()
+        x,y = augment(x, y)
+        display(x, z)
+
 
 if __name__ == '__main__':
     main()
