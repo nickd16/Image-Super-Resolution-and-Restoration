@@ -1,12 +1,11 @@
 import random
 import torch
-from edsr import *
 import pickle
 from train import checkpoint
 import matplotlib.pyplot as plt
 from data_processing import *
 from utils import *
-from srcnn import *
+from models import *
 
 def compare_loss(checkpoints):
     ckps = []
