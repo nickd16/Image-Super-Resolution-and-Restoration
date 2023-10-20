@@ -1,11 +1,12 @@
 import random
 import torch
-from model import *
+from edsr import *
 import pickle
 from train import checkpoint
 import matplotlib.pyplot as plt
 from data_processing import *
 from utils import *
+from srcnn import *
 
 def compare_loss(checkpoints):
     ckps = []
@@ -31,8 +32,8 @@ def visual_test(model, ckp):
         x, y = x.cuda().unsqueeze(0).cuda(), y.unsqueeze(0)
         output = model(x)
         output = output.cpu()
-        mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
-        std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
+        mean = torch.tensor([0.4291, 0.4081, 0.3290]).view(3,1,1)
+        std = torch.tensor([0.2513, 0.2327, 0.2084]).view(3,1,1)
         x = ((x*std) + mean) * 255
         display(x,output,False)
 
@@ -48,17 +49,17 @@ def test_pnr(model, ckp):
         with torch.no_grad():
             for bidx,(x,y) in enumerate(test_loader):
                 outputs = model(x)
-                x = y_channel(outputs[:,:,8:-8,8:-8])
+                x = y_channel(outputs[:,:,8:-8,8:-8] * 255)
                 y = y_channel(y[:,:,8:-8,8:-8])
                 p = psnr(x, y)
                 total_psnr += p
         print(f'{d} {(total_psnr / dataset.__len__()).item()}')
 
 def main():
-    #compare_loss(['test1', 'test2', 'test3', 'test4', 'test5'])
-    with open('checkpoints/test4.pkl', 'rb') as f:
+    #compare_loss(['srcnn_test1', 'srcnn_test2'])
+    with open('checkpoints/edsr_test2.pkl', 'rb') as f:
         ckp = pickle.load(f)
-    model = EDSR(F=ckp.params['F'], B=ckp.params['B'], res_scale=ckp.params['res_scale'])
+    model = EDSR(F=256, B=32, res_scale=0.1)
     test_pnr(model, ckp)
 
 if __name__ == '__main__':

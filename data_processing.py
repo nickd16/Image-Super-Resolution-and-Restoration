@@ -23,7 +23,7 @@ class DIV2k(Dataset):
             if full:
                 img = cv.resize(img, (size, size))
             self.images.append(cv.cvtColor(img, cv.COLOR_BGR2RGB))
-        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        self.normalize = transforms.Normalize(mean=[0.4291, 0.4081, 0.3290], std=[0.2513, 0.2327, 0.2084])
         self.crop = transforms.RandomCrop((size,size))
         self.blur = transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
 
@@ -54,7 +54,7 @@ class PSNRData(Dataset):
                 self.lr_images.append(cv.cvtColor(img, cv.COLOR_BGR2RGB))
             else:
                 self.hr_images.append(cv.cvtColor(img, cv.COLOR_BGR2RGB))
-        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        self.normalize = transforms.Normalize(mean=[0.4291, 0.4081, 0.3290], std=[0.2513, 0.2327, 0.2084])
 
     def __len__(self):
         return len(self.lr_images)
@@ -78,14 +78,16 @@ def display(image, image_real):
     plt.show()
 
 def main():
-    dataset = DIV2k(train=False, size=96)
-    for _ in range(30):
-        x, y = dataset[0]
-        display(x, y)
-    # dataset = PSNRData(dataset='Set14')
-    # for _ in range(30):
-    #     x, y = dataset[0]
-    #     display(x, y)
+    dataset = DIV2k(train=True, size=96)
+    mean = torch.zeros(3)
+    # std = torch.zeros(3)
+    # for _ in range(dataset.__len__()):
+    #     x = dataset[0]
+    #     x = x / 255.0
+    #     std += torch.std(x, dim=(1,2))
+    #     mean += torch.mean(x, dim=(1,2))
+    # print(mean / dataset.__len__())
+    # print(std / dataset.__len__())
 
 if __name__ == '__main__':
     main()

@@ -11,7 +11,8 @@ import random
 import cv2 as cv
 import torchvision.transforms as transforms
 from data_processing import DIV2k, PSNRData
-from edsr import *
+from edsr import EDSR
+from srcnn import SRCNN
 from utils import *
 import pickle
 import sys
@@ -34,12 +35,12 @@ class checkpoint():
 
     def update_accuracy(self, x, y):
         self.total_y += y.numel()
-        self.total_correct += (x.int() == y).sum().item()
+        self.total_correct += ((x*255).int( )== y).sum().item()
         self.acc.append((self.total_correct / self.total_y))
 
     def update_test_accuracy(self, x, y):
         self.test_total += y.numel()
-        self.test_correct += (x.int() == y).sum().item()
+        self.test_correct += ((x*255).int() == y).sum().item()
         self.test_acc = (self.total_correct / self.total_y)
 
     def update_loss(self, loss, bidx):
@@ -53,7 +54,7 @@ class checkpoint():
         for k,v in kwargs.items():
             self.params[k] = v
         for k,v in model.params.items():
-            self.parmas[k] = v
+            self.params[k] = v
 
     def reset(self):
         self.total_loss = 0
@@ -87,9 +88,8 @@ def train(ckp, model, **kwargs):
             y = y.cuda()
             outputs = model(x)
             optimizer.zero_grad()
-            loss = criterion(outputs, y)
+            loss = criterion(outputs, (y / 255))
             loss.backward()
-            #nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             ckp.update_loss(loss, bidx)
             ckp.update_accuracy(outputs, y)
@@ -117,11 +117,11 @@ def train(ckp, model, **kwargs):
             ckp.test_acc = prev_test_acc
 
 def main():
-    #ckp = checkpoint('test4')
-    with open('checkpoints/test4.pkl', 'rb') as f:
+    #ckp = checkpoint('edsr_test2')
+    with open('checkpoints/edsr_test2.pkl', 'rb') as f:
         ckp = pickle.load(f)
-    model = EDSR(F=64, B=16, res_scale=0.1)
-    train(model, ckp, size=96, lr=10e-5, batch_size=16, epochs=100)
+    model = EDSR(F=256, B=32, res_scale=0.1)
+    train(ckp, model, size=96, lr=10e-6, batch_size=16, epochs=15)
     #test_pnr(ckp, 'Set5', C=64)
     #visual_test(ckp)
 
