@@ -11,8 +11,7 @@ import random
 import cv2 as cv
 import torchvision.transforms as transforms
 from data_processing import DIV2k, PSNRData
-from edsr import EDSR
-from srcnn import SRCNN
+from models import *
 from utils import *
 import pickle
 import sys
