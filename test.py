@@ -34,7 +34,8 @@ def visual_test(model, ckp):
         output = model(x) * 255
         output = output.cpu()
         x = (simple_meanshift(x) * 255).cpu()
-        display(x,output,False)
+        #display(x,output,False)
+        display(output, y, False)
 
 def test_pnr(model, ckp):
     model = model.eval()
@@ -58,6 +59,8 @@ def main():
     # compare_loss(['test4', 'test1', 'test2', 'test3'])
     with open('checkpoints/rcan1.pkl', 'rb') as f:
         ckp = pickle.load(f)
+    model = RCAN()
+    visual_test(model, ckp)
 
 
 if __name__ == '__main__':

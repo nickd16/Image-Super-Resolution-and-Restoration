@@ -116,7 +116,7 @@ def main():
     with open('checkpoints/rcan1.pkl', 'rb') as f:
         ckp = pickle.load(f)
     model = RCAN()
-    train(ckp, model, size=96, lr=10e-5, batch_size=16, epochs=30)
+    train(ckp, model, size=96, lr=10e-5, batch_size=16, epochs=100)
 
 if __name__ == '__main__':
     main()
