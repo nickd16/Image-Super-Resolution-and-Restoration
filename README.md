@@ -1,2 +1,2 @@
 # Image-Super-Resolution-and-Restoration
-Practicing different implementations of image super resolution and image restoration models
+implementations of different image super resolution models 
