@@ -5,7 +5,7 @@ def psnr(img1, img2):
     return 20*(torch.log10((255)/(torch.sqrt(torch.mean((img2 - img1) ** 2)))))
 
 def y_channel(x):
-    Y = (x.squeeze(0).permute(1, 2, 0)) * (torch.tensor([0.299, 0.587, 0.114]).unsqueeze(0).unsqueeze(0))
+    Y = (x.squeeze(0).permute(1, 2, 0)) * (torch.tensor([0.299, 0.587, 0.114], device=x.device).unsqueeze(0).unsqueeze(0))
     return torch.sum(Y, dim=2)
 
 def simple_meanshift(x):

@@ -24,10 +24,10 @@ def augment(x, y):
     return x,y
 
 class DIV2k(Dataset):
-    def __init__(self, size=224, kernel_size=(5,5), sigma=(.1,2), train=True, full=False):
+    def __init__(self, size=224, kernel_size=(5,5), sigma=(.1,4), train=True, full=False):
+        self.full = full
         self.size = size
-        path = '../datasets/DIV2K_'
-        path += 'train_HR' if train else 'valid_HR'
+        path = '../datasets/DIVFLIK' if train else '../datasets/DIV2K_valid_HR'
         self.images = []
         for file in os.listdir(path):
             img = cv.imread(path+'/'+file)
@@ -50,7 +50,8 @@ class DIV2k(Dataset):
         x = self.blur(x)
         x = F.interpolate(x.unsqueeze(0), size=(int(x.shape[1]/2),int(x.shape[2]/2)), mode='bicubic').squeeze(0)
         y = img.clone().detach()
-        x, y = augment(x, y)
+        if not self.full:
+            x, y = augment(x, y)
         x = x / 255.0
         x = self.normalize(x)
         return (x,y)

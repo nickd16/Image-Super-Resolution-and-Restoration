@@ -10,9 +10,11 @@ import torchvision
 import random
 import cv2 as cv
 import torchvision.transforms as transforms
-from data_processing import DIV2k, PSNRData
-from models import *
-from utils import *
+from data_processing import *
+from models.srcnn import SRCNN
+from models.edsr import EDSR
+from models.rcan import RCAN
+from models.utils import *
 import pickle
 import sys
 
@@ -21,26 +23,21 @@ class checkpoint():
         self.name = name
         self.params = {}
         self.loss = []
-        self.acc = []
         self.total_loss = 0
-        self.total_y = 0
-        self.total_correct = 0
-        self.test_total = 0
-        self.test_correct = 0
+        self.best_psnr = 0
         self.optim_state = None
         self.model_weights = None
-        self.test_acc = 0
         self.iters = 0
 
     def update_accuracy(self, x, y):
         self.total_y += y.numel()
-        self.total_correct += ((x*255).int( )== y).sum().item()
+        self.total_correct += ((x*255).int() == y).sum().item()
         self.acc.append((self.total_correct / self.total_y))
 
     def update_test_accuracy(self, x, y):
         self.test_total += y.numel()
         self.test_correct += ((x*255).int() == y).sum().item()
-        self.test_acc = (self.total_correct / self.total_y)
+        self.test_acc = (self.test_correct / self.test_total)
 
     def update_loss(self, loss, bidx):
         self.total_loss += loss.item()
@@ -57,16 +54,12 @@ class checkpoint():
 
     def reset(self):
         self.total_loss = 0
-        self.test_total = 0
-        self.test_correct = 0
-        self.total_y = 0
-        self.total_correct = 0
 
 def train(ckp, model, **kwargs):
     ckp.load_params(model, kwargs)
     model = model.cuda()
     dataset = DIV2k(train=True, size=kwargs['size']) 
-    test_dataset = DIV2k(train=False, size=kwargs['size'])
+    test_dataset = PSNRData('Set5')
     train_loader = DataLoader(dataset, batch_size=kwargs['batch_size'], shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=1)
     criterion = nn.L1Loss()
@@ -89,40 +82,41 @@ def train(ckp, model, **kwargs):
             optimizer.zero_grad()
             loss = criterion(outputs, (y / 255))
             loss.backward()
+            #nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             ckp.update_loss(loss, bidx)
-            ckp.update_accuracy(outputs, y)
+
             progress_bar.update(1) 
-            if (bidx+1) % 50 == 0:
-                print(f'Epoch {i+1} | Loss {ckp.loss[-1]:.4f} | Accuracy {ckp.acc[-1]:.4f}')
         progress_bar.close()
 
-        model.eval()
-        prev_test_acc = ckp.test_acc
-        for bidx, (x,y) in enumerate(test_loader):
-            x = x.cuda()
-            y = y.cuda()
-            outputs = model(x)
-            ckp.update_test_accuracy(outputs, y)
-        print(f'Test Accuray {ckp.test_acc}')
         ckp.reset()
-        if ckp.test_acc > prev_test_acc:
+        model.eval()
+        total_psnr = 0
+        with torch.no_grad():
+            for bidx, (x,y) in enumerate(test_loader):
+                x = x.cuda()
+                y = y.cuda()
+                outputs = model(x)
+                x = y_channel(outputs[:,:,8:-8,8:-8] * 255)
+                y = y_channel(y[:,:,8:-8,8:-8])
+                p = psnr(x, y)
+                total_psnr += p
+        current_psnr = total_psnr / test_dataset.__len__()
+        print(f'Epoch {i+1} | Loss {ckp.loss[-1]:.4f} | PSNR {current_psnr}')
+        if current_psnr > ckp.best_psnr:
+            ckp.best_psnr = current_psnr
             ckp.model_weights = model.state_dict()
             ckp.optim_state = optimizer.state_dict()
             print("Saving Current Model Weights")
             with open(f'checkpoints/{ckp.name}.pkl', 'wb') as f:
                 pickle.dump(ckp, f)
-        else:
-            ckp.test_acc = prev_test_acc
 
 def main():
-    #ckp = checkpoint('edsr_test2')
-    with open('checkpoints/edsr_test2.pkl', 'rb') as f:
+    #ckp = checkpoint('rcan1')
+    with open('checkpoints/rcan1.pkl', 'rb') as f:
         ckp = pickle.load(f)
-    model = EDSR(F=256, B=32, res_scale=0.1)
-    train(ckp, model, size=96, lr=10e-6, batch_size=16, epochs=15)
-    #test_pnr(ckp, 'Set5', C=64)
-    #visual_test(ckp)
+    model = RCAN()
+    train(ckp, model, size=96, lr=10e-5, batch_size=16, epochs=30)
 
 if __name__ == '__main__':
     main()

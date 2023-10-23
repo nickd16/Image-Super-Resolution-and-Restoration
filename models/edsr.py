@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from utils import *
+from models.utils import *
 
 class ResBlock(nn.Module):
     def __init__(self, F, res_scale):

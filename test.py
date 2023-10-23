@@ -4,8 +4,10 @@ import pickle
 from train import checkpoint
 import matplotlib.pyplot as plt
 from data_processing import *
-from utils import *
-from models import *
+from models.utils import *
+from models.srcnn import SRCNN
+from models.edsr import EDSR
+from models.rcan import RCAN
 
 def compare_loss(checkpoints):
     ckps = []
@@ -13,7 +15,7 @@ def compare_loss(checkpoints):
         with open(f'checkpoints/{ckp}.pkl', 'rb') as f:
             ckps.append(pickle.load(f))
     for i in range(len(ckps)):
-        plt.plot(range(1, len(ckps[i].loss)+1), ckps[i].loss, label=ckps[i].name)
+        plt.plot(range(1, len(ckps[i].loss[100:])+1), ckps[i].loss[100:], label=ckps[i].name)
     plt.xlabel('Iterations')
     plt.ylabel('Loss')
     plt.legend()
@@ -21,19 +23,17 @@ def compare_loss(checkpoints):
     plt.show()
 
 def visual_test(model, ckp):
-    dataset = DIV2k(train=False, size=224, full=True) 
+    dataset = DIV2k(train=False, size=224, sigma=(1,7), full=True) 
     model = model.cuda().eval()
     if ckp.model_weights is not None:
         model.load_state_dict(ckp.model_weights)
     for _ in range(16):
         r = random.randint(1,99)
         x,y = dataset[r]
-        x, y = x.cuda().unsqueeze(0).cuda(), y.unsqueeze(0)
-        output = model(x)
+        x, y = x.cuda().unsqueeze(0), y.unsqueeze(0)
+        output = model(x) * 255
         output = output.cpu()
-        mean = torch.tensor([0.4291, 0.4081, 0.3290]).view(3,1,1)
-        std = torch.tensor([0.2513, 0.2327, 0.2084]).view(3,1,1)
-        x = ((x*std) + mean) * 255
+        x = (simple_meanshift(x) * 255).cpu()
         display(x,output,False)
 
 def test_pnr(model, ckp):
@@ -41,7 +41,7 @@ def test_pnr(model, ckp):
     datasets = ['Set5', 'Set14', 'BSD100', 'Urban100']
     for d in datasets:
         dataset = PSNRData(d)
-        test_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+        test_loader = DataLoader(dataset, batch_size=1)
         total_psnr = 0
         if ckp.model_weights is not None:
             model.load_state_dict(ckp.model_weights)
@@ -55,11 +55,10 @@ def test_pnr(model, ckp):
         print(f'{d} {(total_psnr / dataset.__len__()).item()}')
 
 def main():
-    #compare_loss(['srcnn_test1', 'srcnn_test2'])
-    with open('checkpoints/edsr_test2.pkl', 'rb') as f:
+    # compare_loss(['test4', 'test1', 'test2', 'test3'])
+    with open('checkpoints/rcan1.pkl', 'rb') as f:
         ckp = pickle.load(f)
-    model = EDSR(F=256, B=32, res_scale=0.1)
-    test_pnr(model, ckp)
+
 
 if __name__ == '__main__':
     main()
