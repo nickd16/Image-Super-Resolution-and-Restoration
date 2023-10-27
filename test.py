@@ -9,13 +9,16 @@ from models.srcnn import SRCNN
 from models.edsr import EDSR
 from models.rcan import RCAN
 
-def compare_loss(checkpoints):
+def compare(checkpoints, metric='loss'):
     ckps = []
     for ckp in checkpoints:
         with open(f'checkpoints/{ckp}.pkl', 'rb') as f:
             ckps.append(pickle.load(f))
     for i in range(len(ckps)):
-        plt.plot(range(1, len(ckps[i].loss[100:])+1), ckps[i].loss[100:], label=ckps[i].name)
+        psnr = getattr(ckps[i], f'{metric}')
+        for j in range(len(psnr)):
+            getattr(ckps[i], f'{metric}')[j] = getattr(ckps[i], f'{metric}')[j].cpu()
+        plt.plot(range(1, len(getattr(ckps[i], f'{metric}'))+1), getattr(ckps[i], f'{metric}'), label=ckps[i].name)
     plt.xlabel('Iterations')
     plt.ylabel('Loss')
     plt.legend()
@@ -31,11 +34,15 @@ def visual_test(model, ckp):
         r = random.randint(1,99)
         x,y = dataset[r]
         x, y = x.cuda().unsqueeze(0), y.unsqueeze(0)
-        output = model(x) * 255
+        output = model(x).cpu()
+        test_img = (y / 255) - output
+        test_img = test_img.squeeze(0).permute(1,2,0).detach().numpy()
+        plt.imshow(test_img, cmap='coolwarm')
+        output = output * 255
         output = output.cpu()
         x = (simple_meanshift(x) * 255).cpu()
-        #display(x,output,False)
-        display(output, y, False)
+        display(output,y,False)
+        #display(output, y, False)
 
 def test_pnr(model, ckp):
     model = model.eval()
@@ -55,12 +62,23 @@ def test_pnr(model, ckp):
                 total_psnr += p
         print(f'{d} {(total_psnr / dataset.__len__()).item()}')
 
+def image_test(model, ckp, path):
+    normalize = transforms.Normalize(mean=[0.4291, 0.4081, 0.3290], std=[0.2513, 0.2327, 0.2084])
+    model = model.eval()
+    model.load_state_dict(ckp.model_weights)
+    img = cv.cvtColor(cv.imread(path), cv.COLOR_BGR2RGB)
+    x = torch.tensor(img, dtype=torch.float32).permute(2,0,1).unsqueeze(0)
+    x = x / 255
+    x = normalize(x)
+    img = (model(x) * 255).squeeze(0).int().permute(1,2,0).numpy()
+    cv.imwrite('output.png', img)
+
 def main():
-    # compare_loss(['test4', 'test1', 'test2', 'test3'])
-    with open('checkpoints/rcan1.pkl', 'rb') as f:
-        ckp = pickle.load(f)
-    model = RCAN()
-    visual_test(model, ckp)
+    compare(['rcan_test1', 'rcan_test2'], 'PSNR')
+    # with open('checkpoints/rcan1.pkl', 'rb') as f:
+    #     ckp = pickle.load(f)
+    # model = RCAN()
+    # visual_test(model, ckp)
 
 
 if __name__ == '__main__':
