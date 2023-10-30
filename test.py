@@ -15,9 +15,6 @@ def compare(checkpoints, metric='loss'):
         with open(f'checkpoints/{ckp}.pkl', 'rb') as f:
             ckps.append(pickle.load(f))
     for i in range(len(ckps)):
-        psnr = getattr(ckps[i], f'{metric}')
-        for j in range(len(psnr)):
-            getattr(ckps[i], f'{metric}')[j] = getattr(ckps[i], f'{metric}')[j].cpu()
         plt.plot(range(1, len(getattr(ckps[i], f'{metric}'))+1), getattr(ckps[i], f'{metric}'), label=ckps[i].name)
     plt.xlabel('Iterations')
     plt.ylabel('Loss')
@@ -75,10 +72,8 @@ def image_test(model, ckp, path):
 
 def main():
     compare(['rcan_test1', 'rcan_test2'], 'PSNR')
-    # with open('checkpoints/rcan1.pkl', 'rb') as f:
+    # with open('checkpoints/rcan_test1.pkl', 'rb') as f:
     #     ckp = pickle.load(f)
-    # model = RCAN()
-    # visual_test(model, ckp)
 
 
 if __name__ == '__main__':

@@ -23,8 +23,29 @@ def augment(x, y):
     y = tf.rotate(y, angle)
     return x,y
 
+def crop(x, y, size):
+    top = random.randrange(0, x.shape[1]-size)
+    left = random.randrange(0, x.shape[2]-size)
+    height = width = size
+    x = tf.crop(x, top, left, height, width)
+    y = tf.crop(y, top, left, height, width)
+    return (x,y)
+
+class degradation_model(object):
+    def __init__(self, kernel_size=(5,5), sigma1=(.1,4), sigma2=(0,25)):
+        self.blur = transforms.GaussianBlur(kernel_size, sigma1)
+        self.sigma2 = sigma2
+
+    def __call__(self,x):
+        x = self.blur(x)
+        x = F.interpolate(x.unsqueeze(0), size=(int(x.shape[1]/2),int(x.shape[2]/2)), mode='bicubic').squeeze(0)
+        noise = torch.randn(x.shape, requires_grad=False) * random.randrange(self.sigma2[0], self.sigma2[1])
+        x += noise
+        x = torch.clamp(x, 0, 255)
+        return x
+
 class DIV2k(Dataset):
-    def __init__(self, size=224, kernel_size=(5,5), sigma=(.1,4), train=True, full=False):
+    def __init__(self, size=96, kernel_size=(5,5), sigma=(.1,4), train=True, full=False):
         self.full = full
         self.size = size
         path = '../datasets/DIVFLIK' if train else '../datasets/DIV2K_valid_HR'
@@ -35,21 +56,16 @@ class DIV2k(Dataset):
                 img = cv.resize(img, (size, size))
             self.images.append(cv.cvtColor(img, cv.COLOR_BGR2RGB))
         self.normalize = transforms.Normalize(mean=[0.4291, 0.4081, 0.3290], std=[0.2513, 0.2327, 0.2084])
-        self.crop = transforms.RandomCrop((size,size))
-        self.blur = transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
+        self.degrade = degradation_model(kernel_size=kernel_size, sigma1=sigma)
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
-        img = self.images[index]
-        img = torch.tensor(img, dtype=torch.float32)
-        img = img.permute(2, 0, 1)
-        img = self.crop(img)
-        x = img.clone().detach()
-        x = self.blur(x)
-        x = F.interpolate(x.unsqueeze(0), size=(int(x.shape[1]/2),int(x.shape[2]/2)), mode='bicubic').squeeze(0)
-        y = img.clone().detach()
+        x = torch.tensor(self.images[index], dtype=torch.float32).permute(2,0,1)
+        y = torch.tensor(self.images[index], dtype=torch.float32).permute(2,0,1)
+        x, y = crop(x, y, self.size)
+        x = self.degrade(x)
         if not self.full:
             x, y = augment(x, y)
         x = x / 255.0
@@ -91,12 +107,10 @@ def display(image, image_real):
     plt.show()
 
 def main():
-    dataset = DIV2k(train=False, size=96)
+    dataset = DIV2k(train=True)
     for _ in range(5):
         x,y  = dataset[0] 
-        z = y.clone()
-        x,y = augment(x, y)
-        display(x, z)
+        display(x, y)
 
 
 if __name__ == '__main__':
